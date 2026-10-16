@@ -61,15 +61,32 @@ rts3903n-ha-rtsp-ptz/
 
 ## 🚀 Quick Start Guide
 
-### Step 1: Prepare the MicroSD Card
-1. Format a MicroSD card (FAT32, 4GB to 32GB recommended).
-2. Copy the contents of the `sdcard/` folder directly to the root of the MicroSD card:
+### Step 1: Wi-Fi Setup & MicroSD Preparation
+
+1. **Format a MicroSD card** (FAT32 filesystem, 4GB to 32GB recommended).
+2. **Wi-Fi Configuration**:
+   - **If your camera is already paired to your Wi-Fi**: You do not need to do anything! The camera already stores your Wi-Fi credentials in internal flash memory.
+   - **If setting up on a new Wi-Fi or router**:
+     1. In the `sdcard/` folder, find `wpa_supplicant.conf.example`.
+     2. Rename it to `wpa_supplicant.conf`.
+     3. Open it with any text editor and insert your Wi-Fi credentials:
+        ```ini
+        network={
+            ssid="YOUR_WIFI_SSID"
+            psk="YOUR_WIFI_PASSWORD"
+            key_mgmt=WPA-PSK
+        }
+        ```
+     > **Note**: RTS3903N cameras only support **2.4 GHz Wi-Fi** networks (5 GHz is not supported by the hardware).
+3. **Copy files to MicroSD**:
+   Copy the contents of the `sdcard/` folder directly to the root of the MicroSD card:
    - `fshare2fifo`
    - `motor`
    - `rRTSPServer`
    - `run_rtsp.sh`
    - `lib/` (folder with shared libraries)
-3. Insert the MicroSD card into the camera and power it on.
+   - `wpa_supplicant.conf` (if created above)
+4. Insert the MicroSD card into the camera and power it on.
 
 ---
 
