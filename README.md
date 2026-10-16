@@ -175,7 +175,7 @@ shortcuts:
 To compile the binaries from source for MIPS-I Linux (uClibc):
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/rts3903n-ha-rtsp-ptz.git
+git clone https://github.com/gianlucasaroni/rts3903n-ha-rtsp-ptz.git
 cd rts3903n-ha-rtsp-ptz
 
 # Build using Docker with the Realtek toolchain:
