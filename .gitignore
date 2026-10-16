@@ -11,5 +11,8 @@
 *wpa_supplicant.conf
 !wpa_supplicant.conf.example
 
+# Toolchain
+rsdk-*/
+
 # Temporary files
 /tmp/
