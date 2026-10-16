@@ -5,7 +5,7 @@
 
 # Kill existing instances if any
 killall -9 rRTSPServer fshare2fifo motor 2>/dev/null
-sleep 1
+sleep 2
 
 # Detect SD card directory
 SD_DIR=$(cd "$(dirname "$0")" && pwd)
