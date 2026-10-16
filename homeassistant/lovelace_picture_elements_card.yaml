@@ -1,0 +1,64 @@
+# ==============================================================================
+# Lovelace Dashboard Card: Native picture-elements (No custom components needed)
+# Replace camera.camera_rts3903n with your Home Assistant camera entity_id.
+# ==============================================================================
+
+type: picture-elements
+camera_image: camera.camera_rts3903n
+camera_view: live
+elements:
+  # Up Arrow
+  - type: icon
+    icon: mdi:arrow-up-drop-circle
+    tap_action:
+      action: perform-action
+      perform_action: rest_command.camera_ptz_up
+    style:
+      top: 15%
+      left: 50%
+      color: 'rgba(255, 255, 255, 0.9)'
+      transform: translate(-50%, -50%) scale(2)
+      z-index: 10
+      cursor: pointer
+
+  # Down Arrow
+  - type: icon
+    icon: mdi:arrow-down-drop-circle
+    tap_action:
+      action: perform-action
+      perform_action: rest_command.camera_ptz_down
+    style:
+      top: 85%
+      left: 50%
+      color: 'rgba(255, 255, 255, 0.9)'
+      transform: translate(-50%, -50%) scale(2)
+      z-index: 10
+      cursor: pointer
+
+  # Left Arrow
+  - type: icon
+    icon: mdi:arrow-left-drop-circle
+    tap_action:
+      action: perform-action
+      perform_action: rest_command.camera_ptz_left
+    style:
+      top: 50%
+      left: 10%
+      color: 'rgba(255, 255, 255, 0.9)'
+      transform: translate(-50%, -50%) scale(2)
+      z-index: 10
+      cursor: pointer
+
+  # Right Arrow
+  - type: icon
+    icon: mdi:arrow-right-drop-circle
+    tap_action:
+      action: perform-action
+      perform_action: rest_command.camera_ptz_right
+    style:
+      top: 50%
+      left: 90%
+      color: 'rgba(255, 255, 255, 0.9)'
+      transform: translate(-50%, -50%) scale(2)
+      z-index: 10
+      cursor: pointer

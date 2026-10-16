@@ -1,0 +1,15 @@
+# macOS
+.DS_Store
+*.swp
+*.bak
+
+# Build artifacts
+*.o
+*.log
+
+# Sensitive credentials
+*wpa_supplicant.conf
+!wpa_supplicant.conf.example
+
+# Temporary files
+/tmp/

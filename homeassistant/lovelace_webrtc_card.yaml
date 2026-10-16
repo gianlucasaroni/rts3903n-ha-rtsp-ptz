@@ -1,0 +1,27 @@
+# ==============================================================================
+# Lovelace Dashboard Card: custom:webrtc-camera (AlexxIT / go2rtc)
+# Recommended for ultra-low latency (<250ms) and overlay PTZ controls.
+# Replace CAMERA_IP with your camera's local IP address.
+# ==============================================================================
+
+type: custom:webrtc-camera
+url: rtsp://CAMERA_IP/ch0_0.h264
+media: video
+mode: webrtc,mse
+ui: true
+shortcuts:
+  - name: Pan Left
+    icon: mdi:arrow-left-bold
+    service: rest_command.camera_ptz_left
+
+  - name: Tilt Up
+    icon: mdi:arrow-up-bold
+    service: rest_command.camera_ptz_up
+
+  - name: Tilt Down
+    icon: mdi:arrow-down-bold
+    service: rest_command.camera_ptz_down
+
+  - name: Pan Right
+    icon: mdi:arrow-right-bold
+    service: rest_command.camera_ptz_right

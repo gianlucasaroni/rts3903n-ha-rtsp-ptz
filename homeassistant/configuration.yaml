@@ -1,0 +1,31 @@
+# ==============================================================================
+# Home Assistant: configuration.yaml
+# Replace CAMERA_IP with your camera's local IP address (e.g. 192.168.1.197)
+# ==============================================================================
+
+rest_command:
+  camera_ptz_up:
+    url: "http://CAMERA_IP:8080/up?steps=50"
+    method: GET
+
+  camera_ptz_down:
+    url: "http://CAMERA_IP:8080/down?steps=50"
+    method: GET
+
+  camera_ptz_left:
+    url: "http://CAMERA_IP:8080/left?steps=120"
+    method: GET
+
+  camera_ptz_right:
+    url: "http://CAMERA_IP:8080/right?steps=120"
+    method: GET
+
+  camera_ptz_stop:
+    url: "http://CAMERA_IP:8080/stop"
+    method: GET
+
+# Optional: Native Generic Camera entity (if not using direct RTSP in WebRTC)
+camera:
+  - platform: generic
+    name: "Camera RTS3903N"
+    stream_source: "rtsp://CAMERA_IP/ch0_0.h264"
