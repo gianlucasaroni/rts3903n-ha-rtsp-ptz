@@ -1,32 +1,26 @@
-/*
- * Realtek RTS3903N fshare2fifo v4 (Rock-Solid Jitter-Proof Streaming Engine)
- * Direct pointer tracking: O(1) CPU usage, 1MB non-blocking pipe.
- * Smart jitter handling: NEVER corrupts in-flight streams, drops single frames on lag.
- */
-
-#define _GNU_SOURCE
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <stdint.h>
-#include <unistd.h>
+#include <stdlib.h>
 #include <fcntl.h>
-#include <sys/stat.h>
 #include <sys/mman.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <time.h>
 #include <signal.h>
 #include <errno.h>
-#include <time.h>
 
 #define BUFFER_FILE "/dev/shm/fshare_frame_buf"
-#define DATA_OFF    300u
-#define DATA_SZ     0x1B4000u
-#define TOTAL_SZ    1786156u
-#define REC_HDR_SZ  22u
+#define TOTAL_SZ 1786156u
+#define DATA_OFF 300u
+#define DATA_SZ  0x1B4000u
+#define REC_HDR_SZ 22u
 
-#define HDR_VALID   0x04
-#define HDR_HEAD    0x0C
-#define HDR_TAIL    0x10
-#define HDR_SEQ     0x18
+#define HDR_MAGIC 0x00u
+#define HDR_VALID 0x04u
+#define HDR_HEAD  0x0Cu
+#define HDR_TAIL  0x10u
+#define HDR_SEQ   0x18u
 #define SLOT_OFF(k) (0x1Cu + 16u * (k))
 
 #ifndef F_SETPIPE_SZ
@@ -159,7 +153,7 @@ int main(int argc, char **argv) {
     hdr_wr_u32(SLOT_OFF(slot_k) + 12, 0x0400);
     hdr_wr_u32(SLOT_OFF(slot_k), 1);
 
-    fprintf(stderr, "fshare2fifo v4 live: slot %d, cursor %u, off %u\n",
+    fprintf(stderr, "fshare2fifo v5 live: slot %d, cursor %u, off %u\n",
             slot_k, cursor, cur_off);
 
     uint8_t *payload = malloc(512 * 1024);
@@ -173,15 +167,23 @@ int main(int argc, char **argv) {
     while (running) {
         uint32_t ring_newest = hdr_u32(HDR_SEQ);
 
+        /* Auto-recover from any desync or cursor overflow */
+        if (cursor > ring_newest || (ring_newest - cursor > 80)) {
+            cursor = ring_newest > 2 ? ring_newest - 2 : ring_newest;
+            if (!find_record_by_seq(cursor, &cur_off)) {
+                cur_off = hdr_u32(HDR_TAIL);
+            }
+        }
+
         /* Advance while there are new records in the ring */
         while (ring_newest > cursor) {
             rec_hdr h;
             ring_copy(cur_off, &h, sizeof(h));
 
-            if (!magic_ok(h.magic)) {
+            if (!magic_ok(h.magic) || h.seq > ring_newest) {
                 /* Desync: search for current cursor */
                 if (!find_record_by_seq(cursor + 1, &cur_off)) {
-                    cursor = ring_newest;
+                    cursor = ring_newest > 2 ? ring_newest - 2 : ring_newest;
                     find_record_by_seq(cursor, &cur_off);
                 }
                 break;
@@ -207,14 +209,13 @@ int main(int argc, char **argv) {
                             write(out_fd, payload, h.len);
                             last_successful_write = time(NULL);
                         }
-                        /* On Wi-Fi jitter (<3s), do NOT drain: just drop this single frame safely */
                     }
                 }
 
                 cur_off = (cur_off + REC_HDR_SZ + h.len) % DATA_SZ;
                 hdr_wr_u32(SLOT_OFF(slot_k) + 8, cursor);
-            } else if (h.seq > cursor + 1) {
-                /* Sequence jump: follow to next record */
+            } else if (h.seq > cursor + 1 && h.seq <= ring_newest) {
+                /* Valid sequence jump: follow to next record */
                 cursor = h.seq - 1;
             } else {
                 /* Re-sync offset if wrapped or stalled */
@@ -222,7 +223,7 @@ int main(int argc, char **argv) {
                 if (find_record_by_seq(cursor + 1, &next_off)) {
                     cur_off = next_off;
                 } else {
-                    cursor = ring_newest > 5 ? ring_newest - 5 : 0;
+                    cursor = ring_newest > 2 ? ring_newest - 2 : ring_newest;
                     find_record_by_seq(cursor, &cur_off);
                 }
                 break;
