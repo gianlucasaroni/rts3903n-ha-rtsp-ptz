@@ -70,6 +70,22 @@ ethmac=d2:`ifconfig wlan0 |grep HWaddr|cut -d' ' -f10|cut -d: -f2-`
 ifconfig eth0 hw ether $ethmac
 ifconfig eth0 up
 
+# Avvia la connessione Wi-Fi automaticamente
+if ! ifconfig wlan0 2>/dev/null | grep -q "inet addr"; then
+    WPA_CONF=""
+    if [ -f /tmp/sd/wpa_supplicant.conf ]; then
+        WPA_CONF="/tmp/sd/wpa_supplicant.conf"
+    elif [ -f /backup/wpa_supplicant.conf ]; then
+        WPA_CONF="/backup/wpa_supplicant.conf"
+    fi
+    if [ -n "$WPA_CONF" ]; then
+        cp -f "$WPA_CONF" /tmp/wpa_supplicant.conf
+        killall wpa_supplicant 2>/dev/null
+        wpa_supplicant -c/tmp/wpa_supplicant.conf -g/tmp/wpa_supplicant-global -Dwext -iwlan0 -B
+        udhcpc -i wlan0 -b -s /backup/script/default.script 2>/dev/null &
+    fi
+fi
+
 #multi sensor compatible
 ########################################################################
 try_count=3
@@ -140,8 +156,12 @@ fi
 watchdog -t 2 -T 5 /dev/watchdog &
 
 # Monta la MicroSD e avvia automaticamente RTSP & PTZ
-for i in 1 2 3 4 5; do
-    [ -b /dev/mmcblk0p1 ] && mkdir -p /tmp/sd && mount -t vfat /dev/mmcblk0p1 /tmp/sd 2>/dev/null
+mkdir -p /tmp/sd
+mknod /dev/mmcblk0 b 179 0 2>/dev/null
+mknod /dev/mmcblk0p1 b 179 1 2>/dev/null
+
+for i in 1 2 3 4 5 6 7 8 9 10; do
+    mount -t vfat /dev/mmcblk0p1 /tmp/sd 2>/dev/null
     [ -f "/tmp/sd/run_rtsp.sh" ] && break
     sleep 1
 done
@@ -153,3 +173,4 @@ elif [ -f "/var/tmp/sd/run_rtsp.sh" ]; then
     echo "=== Avvio Custom RTSP Firmware da MicroSD ==="
     sh /var/tmp/sd/run_rtsp.sh &
 fi
+
