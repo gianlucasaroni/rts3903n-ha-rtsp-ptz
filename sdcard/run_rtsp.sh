@@ -24,14 +24,19 @@ echo "=== Running RTSP, PTZ & Audio from $SD_DIR ==="
 
 chmod +x "$SD_DIR/fshare2fifo" "$SD_DIR/motor" "$SD_DIR/rRTSPServer" "$SD_DIR/audio_stream" "$SD_DIR/speaker_server" 2>/dev/null
 
-# 3. Optional: Apply Wi-Fi config from SD card if present
+# 3. Optional: Apply Wi-Fi config from SD card ONLY if Wi-Fi is not connected
 if [ -f "$SD_DIR/wpa_supplicant.conf" ]; then
-    echo "Applying wpa_supplicant.conf from SD card..."
-    cp -f "$SD_DIR/wpa_supplicant.conf" /tmp/wpa_supplicant.conf
-    killall wpa_supplicant 2>/dev/null
-    wpa_supplicant -c/tmp/wpa_supplicant.conf -g/tmp/wpa_supplicant-global -Dwext -iwlan0 -B
-    udhcpc -i wlan0 -b -s /backup/script/default.script 2>/dev/null &
+    if ! ifconfig wlan0 2>/dev/null | grep -q "inet addr"; then
+        echo "Applying wpa_supplicant.conf from SD card..."
+        cp -f "$SD_DIR/wpa_supplicant.conf" /tmp/wpa_supplicant.conf
+        killall wpa_supplicant 2>/dev/null
+        wpa_supplicant -c/tmp/wpa_supplicant.conf -g/tmp/wpa_supplicant-global -Dwext -iwlan0 -B
+        udhcpc -i wlan0 -b -s /backup/script/default.script 2>/dev/null &
+    else
+        echo "Wi-Fi already connected, keeping active connection."
+    fi
 fi
+
 
 # 4. Wait for Realtek rmm engine to create shared ring buffer
 echo "Waiting for /dev/shm/fshare_frame_buf..."
