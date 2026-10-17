@@ -6,8 +6,8 @@
 # 1. Kill unused factory/cloud background daemons to save RAM and CPU
 killall -9 arp_test log_server dispatch cloud p2p_tnp mp4record oss 2>/dev/null
 
-# 2. Kill existing RTSP / PTZ instances if any
-killall -9 rRTSPServer fshare2fifo motor 2>/dev/null
+# 2. Kill existing RTSP / PTZ / Audio instances if any
+killall -9 rRTSPServer fshare2fifo motor audio_stream 2>/dev/null
 sleep 2
 
 # Detect SD card directory
@@ -20,9 +20,9 @@ if [ ! -f "$SD_DIR/fshare2fifo" ]; then
     fi
 fi
 
-echo "=== Running RTSP & PTZ from $SD_DIR ==="
+echo "=== Running RTSP, PTZ & Audio from $SD_DIR ==="
 
-chmod +x "$SD_DIR/fshare2fifo" "$SD_DIR/motor" "$SD_DIR/rRTSPServer" 2>/dev/null
+chmod +x "$SD_DIR/fshare2fifo" "$SD_DIR/motor" "$SD_DIR/rRTSPServer" "$SD_DIR/audio_stream" 2>/dev/null
 
 # 3. Optional: Apply Wi-Fi config from SD card if present
 if [ -f "$SD_DIR/wpa_supplicant.conf" ]; then
@@ -62,8 +62,15 @@ echo "Starting PTZ HTTP Daemon on port 8080..."
 "$SD_DIR/motor" -d 8080 >/tmp/ptz.log 2>&1 &
 sleep 1
 
-# 8. Re-kill any cloud daemons that might have been spawned during boot
+# 8. Start Local Audio Streamer (Microphone AAC) on port 8081
+if [ -f "$SD_DIR/audio_stream" ]; then
+    echo "Starting Audio Streamer on port 8081..."
+    "$SD_DIR/audio_stream" >/tmp/audio.log 2>&1 &
+    sleep 1
+fi
+
+# 9. Re-kill any cloud daemons that might have been spawned during boot
 killall -9 arp_test log_server dispatch 2>/dev/null
 
 echo "=== All services started successfully ==="
-ps | grep -E "rRTSPServer|fshare2fifo|motor"
+ps | grep -E "rRTSPServer|fshare2fifo|motor|audio_stream"
