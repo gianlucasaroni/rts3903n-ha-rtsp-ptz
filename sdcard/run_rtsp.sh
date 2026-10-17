@@ -4,7 +4,7 @@
 # ==============================================================================
 
 # 1. Kill unused factory/cloud background daemons to save RAM and CPU
-killall -9 arp_test log_server dispatch cloud p2p_tnp mp4record oss 2>/dev/null
+killall -9 arp_test log_server cloud p2p_tnp mp4record oss 2>/dev/null
 
 # 2. Kill existing RTSP / PTZ / Audio instances if any
 killall -9 rRTSPServer fshare2fifo motor audio_stream speaker_server 2>/dev/null
@@ -19,6 +19,8 @@ if [ ! -f "$SD_DIR/fshare2fifo" ]; then
         SD_DIR="/var/tmp/sd"
     fi
 fi
+
+export LD_LIBRARY_PATH="$SD_DIR/lib:/home/lib:/home/rt/lib:/home/app/locallib:/home/app/lib:/lib:/usr/lib:$LD_LIBRARY_PATH"
 
 echo "=== Running RTSP, PTZ & Audio from $SD_DIR ==="
 
@@ -52,7 +54,7 @@ fi
 
 # 5. Start RTSP Server on port 554
 echo "Starting rRTSPServer on port 554..."
-export LD_LIBRARY_PATH="$SD_DIR/lib:/home/app/lib:/lib:/usr/lib"
+export LD_LIBRARY_PATH="$SD_DIR/lib:/home/lib:/home/rt/lib:/home/app/locallib:/home/app/lib:/lib:/usr/lib"
 cd "$SD_DIR"
 ./rRTSPServer -p 554 -d >/tmp/rtsp.log 2>&1 &
 sleep 1
@@ -84,7 +86,7 @@ if [ -f "$SD_DIR/speaker_server" ]; then
 fi
 
 # 10. Re-kill any cloud daemons that might have been spawned during boot
-killall -9 arp_test log_server dispatch 2>/dev/null
+killall -9 arp_test log_server 2>/dev/null
 
 echo "=== All services started successfully ==="
 ps | grep -E "rRTSPServer|fshare2fifo|motor|audio_stream|speaker_server"

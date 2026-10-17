@@ -1,7 +1,7 @@
 /*
- * Realtek RTS3903N fshare2fifo v7 (Ultra-Low-Latency Real-Time Streaming Engine)
+ * Realtek RTS3903N fshare2fifo v9 (Ultra-Low-Latency Real-Time Streaming Engine)
  * Sequential Ring Tracker: Follows ring buffer directly via head/tail pointers.
- * No sequence desync, no brittle search loops. O(1) CPU, zero memory allocation in loop.
+ * No sequence desync, zero memory allocation in loop, O(1) CPU.
  * Zero-Lag Keyframe Flushing: Purges pipe backlog on IDR keyframe and buffer-full.
  */
 
@@ -40,8 +40,13 @@
 #define PURGE_THRESHOLD (32 * 1024)
 
 typedef struct __attribute__((packed)) {
-    uint32_t len, seq, magic, ts;
-    uint16_t type, chain, extra;
+    uint32_t len;      /* Total record length including 22-byte header */
+    uint32_t seq;      /* Sequence number */
+    uint32_t ts_sec;   /* Timestamp sec */
+    uint32_t ts_usec;  /* Timestamp usec */
+    uint16_t type;     /* Record type: 0x0402, 0x0404 (H.264 video) */
+    uint16_t chain;    /* Chain index */
+    uint16_t extra;    /* Extra flags */
 } rec_hdr;
 
 static volatile uint8_t *buf;
@@ -59,10 +64,6 @@ static void ring_copy(uint32_t off, void *dst, size_t n) {
     memcpy(dst, (const void *)(buf + DATA_OFF + off), first);
     if (first < n)
         memcpy((uint8_t *)dst + first, (const void *)(buf + DATA_OFF), n - first);
-}
-
-static inline int magic_ok(uint32_t m) {
-    return (m >> 16) >= 0x6a00 && (m >> 16) <= 0x6aff;
 }
 
 static inline uint32_t hdr_u32(unsigned off) {
@@ -155,16 +156,18 @@ int main(int argc, char **argv) {
     uint8_t *payload = malloc(512 * 1024);
     if (!payload) return 1;
 
-    /* Start at HDR_TAIL (oldest valid record) */
-    uint32_t cur_off = hdr_u32(HDR_TAIL);
-    uint32_t last_seq = 0;
+    /* Start directly at HDR_HEAD (live edge) */
+    uint32_t cur_off = hdr_u32(HDR_HEAD);
+    uint32_t last_seq = hdr_u32(HDR_SEQ);
 
-    hdr_wr_u32(SLOT_OFF(slot_k) + 8, hdr_u32(HDR_SEQ));
-    hdr_wr_u32(SLOT_OFF(slot_k) + 12, 0x0400);
+    /* Claim reader slot with active PID so rmm recognizes the consumer */
+    hdr_wr_u32(SLOT_OFF(slot_k) + 4, (uint32_t)getpid());
+    hdr_wr_u32(SLOT_OFF(slot_k) + 8, last_seq);
+    hdr_wr_u32(SLOT_OFF(slot_k) + 12, 0x0d00);
     hdr_wr_u32(SLOT_OFF(slot_k), 1);
 
-    fprintf(stderr, "fshare2fifo v7 live tracking started: slot %d, off %u\n",
-            slot_k, cur_off);
+    fprintf(stderr, "fshare2fifo v9 live edge started: slot %d, pid %u, off %u, seq %u\n",
+            slot_k, (unsigned)getpid(), cur_off, last_seq);
 
     unsigned long long total_bytes = 0;
     unsigned total_frames = 0;
@@ -178,17 +181,19 @@ int main(int argc, char **argv) {
             rec_hdr h;
             ring_copy(cur_off, &h, sizeof(h));
 
-            if (!magic_ok(h.magic) || h.len > 512 * 1024) {
-                /* Buffer wrapped or corrupted: resync to tail */
-                cur_off = hdr_u32(HDR_TAIL);
+            if (h.len < REC_HDR_SZ || h.len > 512 * 1024) {
+                /* Buffer wrapped or corrupted: resync to head */
+                cur_off = head;
                 break;
             }
 
-            /* Video record (type 0x0400 = 1080p stream) */
-            if ((h.type & 0xFF00) == 0x0400 && h.len > 0) {
-                ring_copy(cur_off + REC_HDR_SZ, payload, h.len);
+            uint32_t payload_len = h.len - REC_HDR_SZ;
 
-                int keyframe = is_keyframe(payload, h.len);
+            /* Video record (type 0x0400 = 1080p stream) */
+            if ((h.type & 0xFF00) == 0x0400 && payload_len > 0) {
+                ring_copy(cur_off + REC_HDR_SZ, payload, payload_len);
+
+                int keyframe = is_keyframe(payload, payload_len);
                 if (keyframe) {
                     int unread = 0;
                     if (ioctl(dummy_rd_fd, FIONREAD, &unread) == 0 && unread > PURGE_THRESHOLD) {
@@ -196,13 +201,13 @@ int main(int argc, char **argv) {
                     }
                 }
 
-                ssize_t w = write(out_fd, payload, h.len);
+                ssize_t w = write(out_fd, payload, payload_len);
                 if (w > 0) {
                     total_bytes += w;
                     total_frames++;
                 } else if (w < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
                     drain_pipe();
-                    w = write(out_fd, payload, h.len);
+                    w = write(out_fd, payload, payload_len);
                     if (w > 0) {
                         total_bytes += w;
                         total_frames++;
@@ -211,7 +216,7 @@ int main(int argc, char **argv) {
             }
 
             last_seq = h.seq;
-            cur_off = (cur_off + REC_HDR_SZ + h.len) % DATA_SZ;
+            cur_off = (cur_off + h.len) % DATA_SZ;
             hdr_wr_u32(SLOT_OFF(slot_k) + 8, last_seq);
 
             /* Re-read head in case producer advanced */
@@ -230,6 +235,7 @@ int main(int argc, char **argv) {
         usleep(3000); /* 3 ms polling */
     }
 
+    hdr_wr_u32(SLOT_OFF(slot_k) + 4, 0);
     hdr_wr_u32(SLOT_OFF(slot_k) + 12, 0);
     hdr_wr_u32(SLOT_OFF(slot_k), 0);
     close(out_fd);

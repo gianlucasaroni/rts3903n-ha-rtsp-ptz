@@ -86,6 +86,9 @@ if ! ifconfig wlan0 2>/dev/null | grep -q "inet addr"; then
     fi
 fi
 
+# Assicura che telnet sia sempre attivo per accesso di emergenza
+ps | grep -v grep | grep -q telnetd || busybox telnetd &
+
 #multi sensor compatible
 ########################################################################
 try_count=3
@@ -137,22 +140,19 @@ echo 100 > /proc/sys/vm/extfrag_threshold
 echo 1 > /proc/sys/vm/compact_memory
 cd /home/app
 
-# Disabilita demoni cinesi non necessari (risparmia CPU e oltre 13MB di RAM)
+# Disabilita demoni cloud cinesi non necessari (risparmia CPU e oltre 12MB di RAM)
 #./log_server &
-#./dispatch &
+./dispatch &
 #./cloud &
 #./p2p_tnp &
 #./mp4record &
 #./oss &
 
-if [ -f "/tmp/sd/Factory/disabled_test" ]; then
-        echo -e ${YELLOW}detect /tmp/sd/Factory/disabled_test${NONE}
-        /tmp/sd/Factory/config.sh
-        exit
-fi
 ./load_cpld_ssp
 
 ./rmm &
+# Autonomous kick: unblock rmm video ISP streaming without cloud/dispatch dependency
+(sleep 2 && printf '\1\0\0\0' | dd of=/tmp/mmap.info bs=1 seek=1440 count=4 conv=notrunc 2>/dev/null) &
 watchdog -t 2 -T 5 /dev/watchdog &
 
 # Monta la MicroSD e avvia automaticamente RTSP & PTZ
@@ -161,7 +161,7 @@ mknod /dev/mmcblk0 b 179 0 2>/dev/null
 mknod /dev/mmcblk0p1 b 179 1 2>/dev/null
 
 for i in 1 2 3 4 5 6 7 8 9 10; do
-    mount -t vfat /dev/mmcblk0p1 /tmp/sd 2>/dev/null
+    mount -t vfat /dev/mmcblk0p1 /tmp/sd 2>/dev/null || mount -t vfat /dev/mmcblk0 /tmp/sd 2>/dev/null
     [ -f "/tmp/sd/run_rtsp.sh" ] && break
     sleep 1
 done
