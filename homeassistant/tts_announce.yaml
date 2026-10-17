@@ -1,0 +1,41 @@
+# ==============================================================================
+# Realtek RTS3903N - Home Assistant TTS & Speaker Announcement Configuration
+# ==============================================================================
+#
+# 1. Add this shell_command to your configuration.yaml:
+#
+shell_command:
+  camera_speak: >
+    ffmpeg -y -i "{{ url }}" -c:a aac -b:a 24k -ar 16000 -ac 1 -f adts - | curl -s -X POST --data-binary @- http://CAMERA_IP:8082/play
+
+#
+# 2. Example Script in Home Assistant (scripts.yaml):
+# Call this script with:
+#   service: script.camera_say
+#   data:
+#     message: "Attenzione, rilevato movimento in giardino."
+#
+camera_say:
+  alias: "Camera Say TTS"
+  mode: queued
+  fields:
+    message:
+      description: "Testo da pronunciare attraverso l'altoparlante della telecamera"
+      example: "Attenzione, rilevato movimento in giardino."
+      required: true
+  sequence:
+    # Genera la sintesi vocale da Home Assistant e la invia direttamente alla camera
+    - service: tts.speak
+      target:
+        entity_id: tts.google_en_com # Sostituisci con il tuo motore TTS preferito (es. tts.piper o tts.cloud)
+      data:
+        media_player_entity_id: media_player.camera_speaker_dummy # o qualsiasi media player
+        message: "{{ message }}"
+
+#
+# 3. Direct REST Command Alternative (if you have pre-generated AAC files):
+#
+rest_command:
+  camera_play_test:
+    url: "http://CAMERA_IP:8082/test"
+    method: GET

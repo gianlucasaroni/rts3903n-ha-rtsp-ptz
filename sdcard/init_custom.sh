@@ -136,8 +136,8 @@ if [ -f "/tmp/sd/Factory/disabled_test" ]; then
 fi
 ./load_cpld_ssp
 
-./rmm
-watchdog -t 2 -T 5 /dev/watchdog
+./rmm &
+watchdog -t 2 -T 5 /dev/watchdog &
 
 # Monta la MicroSD e avvia automaticamente RTSP & PTZ
 for i in 1 2 3 4 5; do

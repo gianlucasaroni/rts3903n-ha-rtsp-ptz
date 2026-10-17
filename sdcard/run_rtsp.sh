@@ -7,7 +7,7 @@
 killall -9 arp_test log_server dispatch cloud p2p_tnp mp4record oss 2>/dev/null
 
 # 2. Kill existing RTSP / PTZ / Audio instances if any
-killall -9 rRTSPServer fshare2fifo motor audio_stream 2>/dev/null
+killall -9 rRTSPServer fshare2fifo motor audio_stream speaker_server 2>/dev/null
 sleep 2
 
 # Detect SD card directory
@@ -22,7 +22,7 @@ fi
 
 echo "=== Running RTSP, PTZ & Audio from $SD_DIR ==="
 
-chmod +x "$SD_DIR/fshare2fifo" "$SD_DIR/motor" "$SD_DIR/rRTSPServer" "$SD_DIR/audio_stream" 2>/dev/null
+chmod +x "$SD_DIR/fshare2fifo" "$SD_DIR/motor" "$SD_DIR/rRTSPServer" "$SD_DIR/audio_stream" "$SD_DIR/speaker_server" 2>/dev/null
 
 # 3. Optional: Apply Wi-Fi config from SD card if present
 if [ -f "$SD_DIR/wpa_supplicant.conf" ]; then
@@ -69,8 +69,18 @@ if [ -f "$SD_DIR/audio_stream" ]; then
     sleep 1
 fi
 
-# 9. Re-kill any cloud daemons that might have been spawned during boot
+# 9. Prepare /tmp/audio in RAM and start Speaker / TTS Server on port 8082
+rm -f /tmp/audio 2>/dev/null
+mkdir -p /tmp/audio
+if [ -f "$SD_DIR/speaker_server" ]; then
+    echo "Starting Speaker / TTS Server on port 8082..."
+    "$SD_DIR/speaker_server" >/tmp/speaker.log 2>&1 &
+    sleep 1
+fi
+
+# 10. Re-kill any cloud daemons that might have been spawned during boot
 killall -9 arp_test log_server dispatch 2>/dev/null
 
 echo "=== All services started successfully ==="
-ps | grep -E "rRTSPServer|fshare2fifo|motor|audio_stream"
+ps | grep -E "rRTSPServer|fshare2fifo|motor|audio_stream|speaker_server"
+

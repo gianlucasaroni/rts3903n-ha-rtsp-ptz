@@ -13,9 +13,12 @@ Transform budget **Realtek RTS3903N** IP cameras (such as **Mibao**, **Yi IoT**,
 - **1080p Full HD H.264 RTSP Stream** (`rtsp://<CAMERA_IP>/ch0_0.h264`).
 - **100% Local & Private**: Completely cuts off proprietary cloud services; runs entirely in your local network without internet access.
 - **Hardware Pan & Tilt Control**: Native HTTP micro-daemon running directly on the camera (`http://<CAMERA_IP>:8080/`) controlling the Ruimeng MS41909 stepper motor driver via `/dev/ssp`.
+- **Live Microphone Streaming**: AAC-LC audio streamed over HTTP on port 8081 (`http://<CAMERA_IP>:8081/audio.aac`), compatible with go2rtc, Frigate, and browser WebRTC via Opus transcoding.
+- **Two-Way Audio / TTS Playback**: HTTP REST server on port 8082 (`http://<CAMERA_IP>:8082/play`) playing voice announcements and sirens through the camera's physical speaker via Realtek's native IPC queue (`/ipc_rmm`).
 - **Zero-Copy Memory Architecture**: Bypasses sensor hardware locks by tapping directly into the Realtek ISP ring buffer (`/dev/shm/fshare_frame_buf`) with practically **0% CPU usage** and <1MB RAM.
 - **Ultra-Low Latency (<250ms)**: Seamlessly integrates with Home Assistant's `custom:webrtc-camera` (go2rtc) for instant, real-time response.
 - **Fully Autonomous**: Automatically boots and runs from MicroSD on power-up without requiring any external computer or manual intervention.
+
 
 ---
 
@@ -38,16 +41,22 @@ Transform budget **Realtek RTS3903N** IP cameras (such as **Mibao**, **Yi IoT**,
 rts3903n-ha-rtsp-ptz/
 ├── src/
 │   ├── fshare2fifo.c       # Ring buffer reader bridging Realtek ISP memory to FIFO pipe
-│   └── motor.c             # MS41909 motor driver controller & lightweight HTTP PTZ daemon
+│   ├── motor.c             # MS41909 motor driver controller & lightweight HTTP PTZ daemon
+│   ├── audio_stream.c      # Live microphone AAC stream server on port 8081
+│   └── speaker_server.c    # Local TTS & audio playback server on port 8082
 ├── sdcard/
 │   ├── run_rtsp.sh         # Main startup script executed on camera
+│   ├── init_custom.sh      # Clean boot init script replacement (saves >13MB RAM)
 │   ├── fshare2fifo         # Pre-compiled MIPS binary
 │   ├── motor               # Pre-compiled MIPS binary
+│   ├── audio_stream        # Pre-compiled MIPS binary
+│   ├── speaker_server      # Pre-compiled MIPS binary
 │   ├── rRTSPServer         # Pre-compiled RTSP server binary
 │   ├── lib/                # Required shared libraries
 │   └── wpa_supplicant.conf.example
 ├── homeassistant/
 │   ├── configuration.yaml  # REST commands for PTZ motor actions
+│   ├── tts_announce.yaml   # TTS announcement shell_command and scripts
 │   ├── lovelace_webrtc_card.yaml
 │   └── lovelace_picture_elements_card.yaml
 ├── docs/
@@ -55,6 +64,7 @@ rts3903n-ha-rtsp-ptz/
 ├── Makefile
 ├── build.sh                # Docker-based cross-compilation script
 └── LICENSE
+
 ```
 
 ---
