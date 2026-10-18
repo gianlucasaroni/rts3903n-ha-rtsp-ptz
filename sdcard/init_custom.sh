@@ -63,7 +63,7 @@ mkdir -p /tmp/sd
 rm -fr /tmp/sd/FSCK*.REC
 
 set_audio_switch
-/home/app/aacplay /home/app/audio_file/common/poweron.aac 1400 &
+#/home/app/aacplay /home/app/audio_file/common/poweron.aac 1400 &
 
 ifconfig wlan0 up
 ethmac=d2:`ifconfig wlan0 |grep HWaddr|cut -d' ' -f10|cut -d: -f2-`
@@ -140,19 +140,17 @@ echo 100 > /proc/sys/vm/extfrag_threshold
 echo 1 > /proc/sys/vm/compact_memory
 cd /home/app
 
-# Disabilita demoni cloud cinesi non necessari (risparmia CPU e oltre 12MB di RAM)
-#./log_server &
-./dispatch &
-#./cloud &
-#./p2p_tnp &
-#./mp4record &
-#./oss &
-
+# Avvia i demoni factory per inizializzare il pipeline video H.264 di rmm
+./log_server &
 ./load_cpld_ssp
-
+./dispatch &
+./cloud &
+./p2p_tnp &
+./mp4record &
+./oss &
 ./rmm &
-# Autonomous kick: unblock rmm video ISP streaming without cloud/dispatch dependency
-(sleep 2 && printf '\1\0\0\0' | dd of=/tmp/mmap.info bs=1 seek=1440 count=4 conv=notrunc 2>/dev/null) &
+#./watch_process &
+
 watchdog -t 2 -T 5 /dev/watchdog &
 
 # Monta la MicroSD e avvia automaticamente RTSP & PTZ
@@ -166,6 +164,9 @@ for i in 1 2 3 4 5 6 7 8 9 10; do
     sleep 1
 done
 
+# Attendi qualche secondo per permettere a cloud e mp4record di inizializzare lo stream video H.264
+sleep 4
+
 if [ -f "/tmp/sd/run_rtsp.sh" ]; then
     echo "=== Avvio Custom RTSP Firmware da MicroSD ==="
     sh /tmp/sd/run_rtsp.sh &
@@ -173,4 +174,5 @@ elif [ -f "/var/tmp/sd/run_rtsp.sh" ]; then
     echo "=== Avvio Custom RTSP Firmware da MicroSD ==="
     sh /var/tmp/sd/run_rtsp.sh &
 fi
+
 

@@ -4,7 +4,7 @@
 # ==============================================================================
 
 # 1. Kill unused factory/cloud background daemons to save RAM and CPU
-killall -9 arp_test log_server cloud p2p_tnp mp4record oss 2>/dev/null
+killall -9 arp_test log_server dispatch cloud p2p_tnp mp4record oss 2>/dev/null
 
 # 2. Kill existing RTSP / PTZ / Audio instances if any
 killall -9 rRTSPServer fshare2fifo motor audio_stream speaker_server 2>/dev/null
@@ -20,11 +20,11 @@ if [ ! -f "$SD_DIR/fshare2fifo" ]; then
     fi
 fi
 
-export LD_LIBRARY_PATH="$SD_DIR/lib:/home/lib:/home/rt/lib:/home/app/locallib:/home/app/lib:/lib:/usr/lib:$LD_LIBRARY_PATH"
+export LD_LIBRARY_PATH="$SD_DIR/lib:/lib:/usr/lib"
 
-echo "=== Running RTSP, PTZ & Audio from $SD_DIR ==="
+echo "=== Running RTSP & PTZ from $SD_DIR ==="
 
-chmod +x "$SD_DIR/fshare2fifo" "$SD_DIR/motor" "$SD_DIR/rRTSPServer" "$SD_DIR/audio_stream" "$SD_DIR/speaker_server" 2>/dev/null
+chmod +x "$SD_DIR/fshare2fifo" "$SD_DIR/motor" "$SD_DIR/rRTSPServer" 2>/dev/null
 
 # 3. Optional: Apply Wi-Fi config from SD card ONLY if Wi-Fi is not connected
 if [ -f "$SD_DIR/wpa_supplicant.conf" ]; then
@@ -39,8 +39,14 @@ if [ -f "$SD_DIR/wpa_supplicant.conf" ]; then
     fi
 fi
 
+# 4. Wait for Wi-Fi IP address
+echo "Waiting for network IP..."
+for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30; do
+    ifconfig wlan0 2>/dev/null | grep -q "inet addr" && break
+    sleep 1
+done
 
-# 4. Wait for Realtek rmm engine to create shared ring buffer
+# 5. Wait for Realtek rmm engine to create shared ring buffer
 echo "Waiting for /dev/shm/fshare_frame_buf..."
 for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
     [ -f /dev/shm/fshare_frame_buf ] && break
@@ -52,42 +58,28 @@ if [ ! -f /dev/shm/fshare_frame_buf ]; then
     exit 1
 fi
 
-# 5. Start RTSP Server on port 554
+# 6. Reset reader slots 10-14 in SHM to prevent stale locks
+dd if=/dev/zero of=/dev/shm/fshare_frame_buf bs=1 seek=188 count=80 conv=notrunc 2>/dev/null
+
+# 7. Start RTSP Server on port 554
 echo "Starting rRTSPServer on port 554..."
-export LD_LIBRARY_PATH="$SD_DIR/lib:/home/lib:/home/rt/lib:/home/app/locallib:/home/app/lib:/lib:/usr/lib"
 cd "$SD_DIR"
 ./rRTSPServer -p 554 -d >/tmp/rtsp.log 2>&1 &
 sleep 1
 
-# 6. Start Ring-Buffer-to-FIFO bridge (1080p H.264 stream)
+# 8. Start Ring-Buffer-to-FIFO bridge (1080p H.264 stream)
 echo "Starting fshare2fifo bridge..."
 "$SD_DIR/fshare2fifo" -f /tmp/h264_high_fifo >/tmp/f2f.log 2>&1 &
 sleep 1
 
-# 7. Start Local PTZ HTTP Daemon on port 8080
+# 9. Start Local PTZ HTTP Daemon on port 8080
 echo "Starting PTZ HTTP Daemon on port 8080..."
 "$SD_DIR/motor" -d 8080 >/tmp/ptz.log 2>&1 &
 sleep 1
 
-# 8. Start Local Audio Streamer (Microphone AAC) on port 8081
-if [ -f "$SD_DIR/audio_stream" ]; then
-    echo "Starting Audio Streamer on port 8081..."
-    "$SD_DIR/audio_stream" >/tmp/audio.log 2>&1 &
-    sleep 1
-fi
-
-# 9. Prepare /tmp/audio in RAM and start Speaker / TTS Server on port 8082
-rm -f /tmp/audio 2>/dev/null
-mkdir -p /tmp/audio
-if [ -f "$SD_DIR/speaker_server" ]; then
-    echo "Starting Speaker / TTS Server on port 8082..."
-    "$SD_DIR/speaker_server" >/tmp/speaker.log 2>&1 &
-    sleep 1
-fi
-
 # 10. Re-kill any cloud daemons that might have been spawned during boot
-killall -9 arp_test log_server 2>/dev/null
+killall -9 arp_test log_server dispatch cloud p2p_tnp mp4record oss 2>/dev/null
 
 echo "=== All services started successfully ==="
-ps | grep -E "rRTSPServer|fshare2fifo|motor|audio_stream|speaker_server"
+ps | grep -E "rRTSPServer|fshare2fifo|motor"
 
